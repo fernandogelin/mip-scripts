@@ -1,0 +1,251 @@
+---
+title: "Coverage Report"
+author: "Fernando Gelin"
+date: "October 13, 2015"
+output: html_document
+---
+```{r, echo=FALSE, message=FALSE, warning=FALSE} 
+library(VariantAnnotation)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(data.table)
+library(ggvis)
+library(rCharts)
+```
+
+MIP QC
+------------------------------- 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mip_cov_004 = as.data.table(read.table("/Users/fernandogelin/Desktop/scz_targeted/coverage_fgelin_scz_004.txt", header = F, sep=" "))
+mip_cov_004[,V1:= NULL]
+mip_cov_004[,V2:= NULL]
+mip_cov_004[,V3:= NULL]
+mip_cov_004[,V4:= NULL]
+mip_cov_004[,V5:= NULL]
+names(mip_cov_004) <- c("MIP", "position", "total coverage")
+
+mip_cov_005 = as.data.table(read.table("/Users/fernandogelin/Desktop/scz_targeted/coverage_fgelin_scz_005.txt", header = F, sep=" "))
+mip_cov_005[,V1:= NULL]
+mip_cov_005[,V2:= NULL]
+mip_cov_005[,V3:= NULL]
+mip_cov_005[,V4:= NULL]
+mip_cov_005[,V5:= NULL]
+names(mip_cov_005) <- c("MIP", "position", "total coverage")
+
+mip_cov = merge(mip_cov_004, mip_cov_005, by = c("MIP", "position"))
+names(mip_cov) = c("MIP", "position", "coverage_004", "coverage_005")
+
+all_values <- function(x) {
+  if(is.null(x)) return(NULL)
+  row <- mip_cov[mip_cov$MIP == x$MIP, ]
+  paste0(names(row), ": ", format(row), collapse = "<br />")
+}
+
+slider <- input_slider(0, 800000, c(0,800000), step=10000)
+
+mip_cov %>% ggvis(x = ~coverage_004, y = ~coverage_005, key := ~MIP, opacity := 0.3) %>%
+  layer_points() %>%
+  add_tooltip(all_values, "hover") %>%
+  scale_numeric("x", domain = slider, clamp = TRUE)
+
+
+melt_cov = melt(mip_cov)
+melt_cov %>% ggvis(~value) %>% layer_histograms(opacity:=0.6)
+
+```
+
+BAM QC
+------------------------------- 
+
+Percentage of Coverage per Gene
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+scz004_gene_summary_cov = read.table("/Users/fernandogelin/Desktop/scz_targeted/depth_of_coverage_004/depth_of_coverage_fgelin_scz_004.sample_gene_summary.txt", header = TRUE, sep="\t")
+
+scz005_gene_summary_cov = read.table("/Users/fernandogelin/Desktop/scz_targeted/depth_of_coverage_005/depth_of_coverage_fgelin_scz_005.sample_gene_summary.txt", header = TRUE, sep="\t")
+
+melt_summary_gene_cov = melt(scz004_gene_summary_cov, id.vars="Gene")
+above20_gene_cov = filter(melt_summary_gene_cov, grepl("above_20", variable))
+gene_avg_cov_df_20_004 = data.table("Gene" = character(), "Percentage of Coverage" = integer())
+for (i in 1:length(levels(above20_gene_cov$Gene))) {
+     gene = levels(above20_gene_cov$Gene)[i]
+     gene_avg_cov20 = mean(as.numeric(filter(above20_gene_cov, Gene == as.character(gene))$value))
+     df20 = data.table("Gene" = as.character(gene), "Percentage of Coverage" = gene_avg_cov20)
+     gene_avg_cov_df_20_004 = rbind(gene_avg_cov_df_20_004, df20)
+}
+
+above8_gene_cov = filter(melt_summary_gene_cov, grepl("above_8", variable))
+gene_avg_cov_df_8_004 = data.table("Gene" = character(), "Percentage of Coverage" = integer())
+for (i in 1:length(levels(above8_gene_cov$Gene))) {
+     gene = levels(above8_gene_cov$Gene)[i]
+     gene_avg_cov8 = mean(as.numeric(filter(above8_gene_cov, Gene == as.character(gene))$value))
+     df8 = data.table("Gene" = as.character(gene), "Percentage of Coverage" = gene_avg_cov8)
+     gene_avg_cov_df_8_004 = rbind(gene_avg_cov_df_8_004, df8)
+}
+
+melt_summary_gene_cov = melt(scz005_gene_summary_cov, id.vars="Gene")
+above20_gene_cov = filter(melt_summary_gene_cov, grepl("above_20", variable))
+gene_avg_cov_df_20_005 = data.table("Gene" = character(), "Percentage of Coverage" = integer())
+for (i in 1:length(levels(above20_gene_cov$Gene))) {
+     gene = levels(above20_gene_cov$Gene)[i]
+     gene_avg_cov20 = mean(as.numeric(filter(above20_gene_cov, Gene == as.character(gene))$value))
+     df20 = data.table("Gene" = as.character(gene), "Percentage of Coverage" = gene_avg_cov20)
+     gene_avg_cov_df_20_005 = rbind(gene_avg_cov_df_20_005, df20)
+}
+
+above8_gene_cov = filter(melt_summary_gene_cov, grepl("above_8", variable))
+gene_avg_cov_df_8_005 = data.table("Gene" = character(), "Percentage of Coverage" = integer())
+for (i in 1:length(levels(above8_gene_cov$Gene))) {
+     gene = levels(above8_gene_cov$Gene)[i]
+     gene_avg_cov8 = mean(as.numeric(filter(above8_gene_cov, Gene == as.character(gene))$value))
+     df8 = data.table("Gene" = as.character(gene), "Percentage of Coverage" = gene_avg_cov8)
+     gene_avg_cov_df_8_005 = rbind(gene_avg_cov_df_8_005, df8)
+}
+
+```
+Percentage of bases with coverage higher than 20
+```{r,echo=FALSE, warning=FALSE}
+gene_avg_cov_20 = merge(gene_avg_cov_df_20_004[-21],gene_avg_cov_df_20_005[-21], by="Gene")
+names(gene_avg_cov_20) = c("gene", "lane1", "lane2")
+gene_avg_cov_20[,average:=(lane1+lane2)/2]
+gene_avg_cov_20[,c("lane1", "lane2") :=NULL]
+gene_avg_cov_20
+```
+Percentage of bases with coverage higher than 8
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+gene_avg_cov_8 = merge(gene_avg_cov_df_8_004[-21],gene_avg_cov_df_8_005[-21], by="Gene")
+names(gene_avg_cov_8) = c("gene", "lane1", "lane2")
+gene_avg_cov_8[,average:=(lane1+lane2)/2]
+gene_avg_cov_8[,c("lane1", "lane2") :=NULL]
+gene_avg_cov_8
+```
+
+```{r, echo=FALSE, cache=FALSE, message=FALSE, warning=FALSE}
+scz004_summary = read.table("/Users/fernandogelin/Desktop/scz_targeted/depth_of_coverage_004/depth_of_coverage_fgelin_scz_004.sample_summary.txt", header=TRUE, sep="\t")
+
+scz005_summary = read.table("/Users/fernandogelin/Desktop/scz_targeted/depth_of_coverage_005/depth_of_coverage_fgelin_scz_005.sample_summary.txt", header=TRUE, sep="\t")
+
+melt_004_summary = melt(scz004_summary, id.vars="sample_id")
+melt_005_summary = melt(scz005_summary, id.vars="sample_id")
+
+filter(melt_004_summary, variable == c("X._bases_above_8","X._bases_above_20")) %>% ggvis(~factor(variable), ~value) %>% layer_boxplots() 
+filter(melt_005_summary, variable == c("X._bases_above_8","X._bases_above_20")) %>% ggvis(~factor(variable), ~value) %>% layer_boxplots()
+```
+
+VCF QC
+------------------------------ 
+
+Read VCF file, extract depth information and store in a variable (dp), melt the data set.
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+vcf <- readVcf("/Users/fernandogelin/Desktop/scz_targeted/variant_call/scz_20150922_filtered.hg19_multianno.vcf", "hg19")
+```
+
+Extract data (depth, variant, sample and gene) and melt dataset.
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+dp <- geno(vcf)[[3]]
+dp_genes = cbind(as.data.table(names(ranges(vcf))), as.data.table(dp), as.data.table(info(vcf)[32][,1]))
+dp_genes[,group:=NULL]
+dp_genes[,group_name:=NULL]
+colnames(dp_genes)[colnames(dp_genes)=="value"] <- "gene"
+colnames(dp_genes)[colnames(dp_genes)=="V1"] <- "variant"
+dp_genes_melt = melt(dp_genes)
+colnames(dp_genes_melt)[colnames(dp_genes_melt)=="variable"] <- "sample_id"
+colnames(dp_genes_melt)[colnames(dp_genes_melt)=="value"] <- "depth"
+summary(dp_genes_melt)
+```
+
+Loop over dataset to calculate average covarage per sample. Store in a data table and create a boxplot.
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+df_average_cov_per_sample = data.table("Sample" = character(), "average_cov" = integer())
+for (i in 1:length(unique(dp_genes_melt$sample_id))) {
+     #print(paste("Running sample", i, sep=" "))
+     sampleid = levels(dp_genes_melt$sample_id)[i]
+     assign(sampleid, filter(dp_genes_melt, sample_id == as.character(sampleid)))
+     assign(paste(sampleid, "stats", sep="_"), summary(get(sampleid)))
+     avg_cov = as.numeric(strsplit(get(paste(sampleid, "stats", sep="_"))[,4][4], ":")[[1]][2])
+     average_cov_per_sample = data.table("Sample"=sampleid,"average_cov"=avg_cov)
+     df_average_cov_per_sample = rbind(df_average_cov_per_sample, average_cov_per_sample)
+}
+
+p <- ggplot(df_average_cov_per_sample, aes(1, average_cov))
+p + geom_boxplot()
+```
+
+
+Loop over dataset to calculate average covarage per gene, store in a data table and create a boxplot.
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+df_average_cov_per_gene = data.table("Gene" = character(), "average_cov" = integer())
+for (i in 1:length(unique(dp_genes_melt$gene))) {
+     geneid = levels(dp_genes_melt$gene)[i]
+     #print(paste("Running gene", geneid, sep=" "))
+     assign(geneid, filter(dp_genes_melt, gene == as.character(geneid)))
+     assign(paste(geneid, "stats", sep="_"), summary(get(geneid)))
+     avg_cov_g = as.numeric(strsplit(get(paste(geneid, "stats", sep="_"))[,4][4], ":")[[1]][2])
+     #print(avg_cov_g)
+     average_cov_per_gene = data.table("Gene"=geneid,"average_cov"=avg_cov_g)
+     df_average_cov_per_gene = rbind(df_average_cov_per_gene, average_cov_per_gene)
+}
+
+df_average_cov_per_gene
+
+p <- ggplot(df_average_cov_per_gene, aes(1, average_cov))
+p + geom_boxplot()
+```
+
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE, eval=FALSE}
+ggplot(dp_genes_melt, aes(sample_id, depth)) + 
+     geom_point(alpha = 1/10) 
+```
+
+Calculate the percentage of bases with coverage higher than 20 for each sample.
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+covdf <- data.table("sample"=character(), "depth8"=integer(), "depth20"=integer() )
+for (i in 1:length(unique(dp_genes_melt$sample_id))) {
+     #print(paste("Running sample", i, sep=" "))
+     x <- as.data.frame(dp[,i])
+     subset20 <- filter(x, x[,1]>=20)
+     subset8 <- filter(x, x[,1]>=8)
+     cov8 <- dim(subset8)[1]/dim(x)[1]
+     cov20 <- dim(subset20)[1]/dim(x)[1]
+     df = data.table("sample"=names(dp[1,])[i], "depth8"=cov8, "depth20" = cov20)
+     covdf = rbind(covdf, df)
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+summary(covdf)
+covdf %>% ggvis(~depth8) %>% layer_histograms(fill:="blue", opacity:=0.3) %>% layer_histograms(~depth20, fill:="cyan4", opacity:=0.4)
+
+```
+
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+meltcovdf = melt(covdf)
+
+ggplot(meltcovdf, aes(sample, value)) +
+     geom_point(aes(colour=factor(variable), 
+     fill = factor(variable)), shape=21, size = 2, alpha = 0.5) + 
+     scale_fill_manual(values=c("blue", "cyan4")) + 
+     geom_smooth(aes(group=variable))
+
+
+```
+ 
+
+```{r, echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+dim(filter(covdf, depth8>=0.95))[1]/1918
+dim(filter(covdf, depth8>=0.90))[1]/1918
+dim(filter(covdf, depth8>=0.85))[1]/1918
+dim(filter(covdf, depth8>=0.80))[1]/1918
+dim(filter(covdf, depth8>=0.50))[1]/1918
+
+
+dim(filter(covdf, depth20>=0.95))[1]/1918
+dim(filter(covdf, depth20>=0.90))[1]/1918
+dim(filter(covdf, depth20>=0.85))[1]/1918
+dim(filter(covdf, depth20>=0.80))[1]/1918
+dim(filter(covdf, depth20>=0.50))[1]/1918
+```
+
+
+
+
